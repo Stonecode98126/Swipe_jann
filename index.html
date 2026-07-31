@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>捷安片簾動畫 (60-6)</title>
+  <title>頂部可展開式互扣窗簾動畫 (動態連動下方控制區)</title>
   <style>
     * {
       box-sizing: border-box;
@@ -22,7 +22,7 @@
       color: #f8fafc;
     }
 
-    /* 頂部可展開主面板 */
+    /* 頂部主面板 */
     .expandable-panel {
       position: absolute;
       top: 0;
@@ -32,9 +32,9 @@
       background: #1e293b;
       box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
       z-index: 10;
-      transition: height 0.1s linear;
       display: flex;
       flex-direction: column;
+      transition: height 0.05s ease-out;
     }
 
     /* 動畫舞台 */
@@ -45,6 +45,20 @@
       overflow: hidden;
     }
 
+    /* 最大拉伸乳白色外框 */
+    .max-boundary-frame {
+      position: absolute;
+      top: 50%;
+      right: 5vw;
+      transform: translateY(-50%);
+      height: 80%;
+      border: 3px solid rgba(255, 255, 240, 0.85);
+      border-radius: 6px;
+      box-shadow: 0 0 12px rgba(255, 255, 240, 0.2);
+      pointer-events: none;
+      z-index: 20;
+    }
+
     /* 窗簾層級容器 */
     .curtain-container {
       position: absolute;
@@ -52,9 +66,9 @@
       right: 5vw; 
       transform: translateY(-50%);
       height: 80%;
-      width: calc((33.33vh * 0.8) / 4.5); /* 1:4.5 比例 */
       cursor: grab;
       touch-action: none;
+      z-index: 5;
     }
 
     .curtain-panel {
@@ -66,7 +80,6 @@
       border-radius: 4px;
       box-shadow: -6px 0 15px rgba(0, 0, 0, 0.4);
       
-      /* 關鍵設定：圖片等比例縮小為卡片尺寸的 20% (即 1/20 規模)，並重複拼貼填滿 */
       background-size: 20% 20%;
       background-repeat: repeat;
       background-position: center;
@@ -82,63 +95,49 @@
       text-shadow: 0 2px 4px rgba(0,0,0,0.9);
     }
 
-    /* 拖拉把手 */
-    .drag-handle-bar {
-      height: 28px;
-      width: 100%;
-      background: #334155;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      cursor: ns-resize;
-      touch-action: none;
-      border-top: 1px solid rgba(255, 255, 255, 0.1);
-      flex-shrink: 0;
-    }
-
-    .handle-pill {
-      width: 40px;
-      height: 5px;
-      background-color: #94a3b8;
-      border-radius: 3px;
-    }
-
-    /* 下方控制區與兩個下拉選單 */
+    /* 下方控制區：使用 transition 配合 JavaScript 動態調整 padding-top */
     .controls-container {
       width: 100vw;
       height: 100vh;
-      padding-top: 36vh; /* 避開頂部 1/3 面板 */
-      padding-left: 16px;
-      padding-right: 16px;
+      padding-top: 33.33vh; /* 初始避開頂部面板，後續由 JS 即時更新 */
+      padding-left: 20px;
+      padding-right: 20px;
+      padding-bottom: 20px;
       overflow-y: auto;
       box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      transition: padding-top 0.05s ease-out;
     }
 
     .controls-title {
       font-size: 1rem;
-      margin-bottom: 16px;
       color: #38bdf8;
     }
 
+    /* 雙選單網格 */
     .select-grid {
       display: grid;
       grid-template-columns: repeat(2, 1fr);
       gap: 16px;
     }
 
-    .select-group {
+    .control-group {
       display: flex;
       flex-direction: column;
-      gap: 6px;
+      gap: 8px;
     }
 
-    .select-group label {
+    .control-group label {
       font-size: 0.85rem;
       color: #cbd5e1;
       font-weight: 600;
+      display: flex;
+      justify-content: space-between;
     }
 
-    .select-group select {
+    .control-group select {
       background: #334155;
       color: #fff;
       border: 1px solid #475569;
@@ -148,52 +147,93 @@
       outline: none;
     }
 
-    .select-group select:focus {
+    .control-group select:focus {
       border-color: #38bdf8;
+    }
+
+    /* 滑塊樣式區 */
+    .sliders-section {
+      background: #1e293b;
+      padding: 16px;
+      border-radius: 8px;
+      border: 1px solid #334155;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .slider-item {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .slider-item input[type="range"] {
+      width: 100%;
+      accent-color: #38bdf8;
+      cursor: pointer;
+    }
+
+    .val-badge {
+      color: #38bdf8;
+      font-size: 0.85rem;
     }
   </style>
 </head>
 <body>
 
-  <!-- 頂部可展開主面板 -->
+  <!-- 頂部面板 -->
   <div class="expandable-panel" id="expandablePanel">
     <div class="curtain-track-stage">
+      <div class="max-boundary-frame" id="maxBoundaryFrame"></div>
       <div class="curtain-container" id="curtainTrack">
         <!-- 6 層卡片 -->
       </div>
     </div>
-
-    <!-- 往下拖拉把手 -->
-    <div class="drag-handle-bar" id="dragHandle">
-      <div class="handle-pill"></div>
-    </div>
   </div>
 
-  <!-- 控制區 -->
-  <div class="controls-container">
-    <h3 class="controls-title">圖片選擇 (6 張卡片，內文圖檔縮小 1/20 填滿)</h3>
+  <!-- 下方控制區 -->
+  <div class="controls-container" id="controlsContainer">
+    <h3 class="controls-title">即時控制面板</h3>
+    
+    <!-- 1. 圖片選擇下拉選單 -->
     <div class="select-grid">
-      
-      <!-- 單數層選單 -->
-      <div class="select-group">
-        <label for="oddSelect">單數層 (Layer 1, 3, 5)</label>
+      <div class="control-group">
+        <label for="oddSelect">單數層 (1, 3, 5)</label>
         <select id="oddSelect"></select>
       </div>
-
-      <!-- 雙數層選單 -->
-      <div class="select-group">
-        <label for="evenSelect">雙數層 (Layer 2, 4, 6)</label>
+      <div class="control-group">
+        <label for="evenSelect">雙數層 (2, 4, 6)</label>
         <select id="evenSelect"></select>
       </div>
+    </div>
 
+    <!-- 2. 手動滑塊區 -->
+    <div class="sliders-section">
+      <!-- 垂直高度滑塊 -->
+      <div class="slider-item">
+        <label for="heightSlider">
+          <span>高度 (垂直單獨拉伸):</span>
+          <span class="val-badge" id="heightVal">232 cm</span>
+        </label>
+        <input type="range" id="heightSlider" min="232" max="292" value="232" step="1">
+      </div>
+
+      <!-- 橫向寬度滑塊 -->
+      <div class="slider-item">
+        <label for="widthSlider">
+          <span>寬度 (橫向展開):</span>
+          <span class="val-badge" id="widthVal">125 cm</span>
+        </label>
+        <input type="range" id="widthSlider" min="125" max="660" value="125" step="1">
+      </div>
     </div>
   </div>
 
   <script>
-    const TOTAL_LAYERS = 6; // 保持 6 張卡片
-    const FILE_EXTENSION = '.jpg'; // 若圖片副檔名為 .png 可直接改為 '.png'
+    const TOTAL_LAYERS = 6;
+    const FILE_EXTENSION = '.jpg';
 
-    // 指定圖檔名稱清單 (61 個檔名)
     const imageNames = [
       'P10', 'P11', 'P12', 'P13', 'P20', 'P21', 'P22', 'P23', 'P23-1', 'P24',
       'P25', 'P26', 'P30', 'P31', 'P32', 'P33', 'P34', 'p35', 'P36', 'P37',
@@ -204,31 +244,36 @@
     ];
 
     const curtainTrack = document.getElementById('curtainTrack');
+    const maxBoundaryFrame = document.getElementById('maxBoundaryFrame');
     const expandablePanel = document.getElementById('expandablePanel');
-    const dragHandle = document.getElementById('dragHandle');
+    const controlsContainer = document.getElementById('controlsContainer');
+    
     const oddSelect = document.getElementById('oddSelect');
     const evenSelect = document.getElementById('evenSelect');
     
+    const heightSlider = document.getElementById('heightSlider');
+    const widthSlider = document.getElementById('widthSlider');
+    const heightVal = document.getElementById('heightVal');
+    const widthVal = document.getElementById('widthVal');
+
     const panels = [];
 
-    // 預設圖片：單數層用 P10.jpg，雙數層用 P11.jpg
     const currentImages = Array.from({ length: TOTAL_LAYERS }, (_, i) => {
       const defaultName = (i % 2 === 0) ? imageNames[0] : (imageNames[1] || imageNames[0]);
       return `images/${defaultName}${FILE_EXTENSION}`;
     });
 
-    // 強制重繪與更新背景圖輔助函式
     function updatePanelImage(panel, imagePath) {
       if (!panel) return;
       const encodedPath = encodeURI(imagePath);
       panel.style.backgroundImage = `url('${encodedPath}')`;
 
       panel.style.display = 'none';
-      panel.offsetHeight; // 讀取 layout 屬性觸發 reflow
+      panel.offsetHeight;
       panel.style.display = 'flex';
     }
 
-    // 1. 初始化 6 層卡片
+    // 1. 初始化卡片
     function initCurtains() {
       curtainTrack.innerHTML = '';
       for (let i = 0; i < TOTAL_LAYERS; i++) {
@@ -244,7 +289,7 @@
       }
     }
 
-    // 2. 根據指定陣列生成下拉選單選項
+    // 2. 初始化下拉選單
     function initSelectors() {
       oddSelect.innerHTML = '';
       evenSelect.innerHTML = '';
@@ -267,7 +312,6 @@
         evenSelect.selectedIndex = 1;
       }
 
-      // 監聽單數層切換 (控制 Index 0, 2, 4)
       oddSelect.addEventListener('change', (e) => {
         const path = e.target.value;
         [0, 2, 4].forEach(idx => {
@@ -276,7 +320,6 @@
         });
       });
 
-      // 監聽雙數層切換 (控制 Index 1, 3, 5)
       evenSelect.addEventListener('change', (e) => {
         const path = e.target.value;
         [1, 3, 5].forEach(idx => {
@@ -289,24 +332,27 @@
     initCurtains();
     initSelectors();
 
-    // 3. 橫向 11/12 互扣窗簾滑動邏輯
-    let isHorizontalDragging = false;
-    let startX = 0;
+    // 3. 固定卡片寬度計算
+    function initFixedCardDimensions() {
+      const stageHeight = curtainTrack.getBoundingClientRect().height || (window.innerHeight * 0.3333 * 0.8);
+      const singleCardWidth = stageHeight / 4.5;
+      
+      curtainTrack.style.width = `${singleCardWidth}px`;
+
+      const hookThreshold = singleCardWidth * (11 / 12);
+      const maxTotalWidth = singleCardWidth + (hookThreshold * (TOTAL_LAYERS - 1));
+      
+      maxBoundaryFrame.style.width = `${maxTotalWidth}px`;
+
+      const borderWidth = Math.max(2, Math.round(singleCardWidth / 30));
+      maxBoundaryFrame.style.borderWidth = `${borderWidth}px`;
+    }
+
     let currentDragX = 0;
-    let lastSavedDragX = 0;
-
-    function getPanelWidth() {
-      return curtainTrack.getBoundingClientRect().width;
-    }
-
-    function syncCardWidth() {
-      const stageHeight = curtainTrack.getBoundingClientRect().height;
-      curtainTrack.style.width = `${stageHeight / 4.5}px`;
-    }
 
     function updateCurtainPositions(dragDistance) {
-      const panelWidth = getPanelWidth();
-      const hookThreshold = panelWidth * (11 / 12); // 11/12 咬合門檻
+      const panelWidth = curtainTrack.getBoundingClientRect().width;
+      const hookThreshold = panelWidth * (11 / 12);
 
       const maxDrag = hookThreshold * (TOTAL_LAYERS - 1);
       const clampedDrag = Math.max(0, Math.min(dragDistance, maxDrag));
@@ -323,6 +369,46 @@
       });
     }
 
+    // 4. 高度滑塊：同步連動下方控制區的位置
+    heightSlider.addEventListener('input', (e) => {
+      const cmVal = Number(e.target.value);
+      heightVal.innerText = `${cmVal} cm`;
+
+      const minCm = 232, maxCm = 292;
+      const percentRatio = (cmVal - minCm) / (maxCm - minCm);
+      const minVh = 30, maxVh = 70; 
+      const targetVh = minVh + percentRatio * (maxVh - minVh);
+
+      // 1) 調整頂部面板高度
+      expandablePanel.style.height = `${targetVh}vh`;
+
+      // 2) 同步將下方控制區的 padding-top 設為相同的 vh 值，讓控制區往下移
+      controlsContainer.style.paddingTop = `${targetVh}vh`;
+
+      updateCurtainPositions(currentDragX);
+    });
+
+    // 5. 寬度滑塊控制
+    widthSlider.addEventListener('input', (e) => {
+      const cmVal = Number(e.target.value);
+      widthVal.innerText = `${cmVal} cm`;
+
+      const panelWidth = curtainTrack.getBoundingClientRect().width;
+      const hookThreshold = panelWidth * (11 / 12);
+      const maxDragDistance = hookThreshold * (TOTAL_LAYERS - 1);
+
+      const minCm = 125, maxCm = 660;
+      const ratio = (cmVal - minCm) / (maxCm - minCm);
+
+      currentDragX = ratio * maxDragDistance;
+      updateCurtainPositions(currentDragX);
+    });
+
+    // 6. 滑鼠/觸控拖曳同步
+    let isHorizontalDragging = false;
+    let startX = 0;
+    let lastSavedDragX = 0;
+
     curtainTrack.addEventListener('pointerdown', (e) => {
       isHorizontalDragging = true;
       startX = e.clientX;
@@ -333,6 +419,20 @@
       if (!isHorizontalDragging) return;
       const deltaX = startX - e.clientX;
       currentDragX = lastSavedDragX + deltaX;
+
+      const panelWidth = curtainTrack.getBoundingClientRect().width;
+      const hookThreshold = panelWidth * (11 / 12);
+      const maxDragDistance = hookThreshold * (TOTAL_LAYERS - 1);
+
+      const clampedDrag = Math.max(0, Math.min(currentDragX, maxDragDistance));
+      const ratio = clampedDrag / (maxDragDistance || 1);
+      
+      const minCm = 125, maxCm = 660;
+      const calculatedCm = Math.round(minCm + ratio * (maxCm - minCm));
+      
+      widthSlider.value = calculatedCm;
+      widthVal.innerText = `${calculatedCm} cm`;
+
       updateCurtainPositions(currentDragX);
     });
 
@@ -346,45 +446,7 @@
     curtainTrack.addEventListener('pointerup', stopHorizontalDrag);
     curtainTrack.addEventListener('pointercancel', stopHorizontalDrag);
 
-    // 4. 縱向拖拉展開/收合全螢幕邏輯
-    let isVerticalDragging = false;
-    let startY = 0;
-    let initialPanelHeight = 0;
-
-    dragHandle.addEventListener('pointerdown', (e) => {
-      isVerticalDragging = true;
-      startY = e.clientY;
-      initialPanelHeight = expandablePanel.getBoundingClientRect().height;
-      dragHandle.setPointerCapture(e.pointerId);
-    });
-
-    dragHandle.addEventListener('pointermove', (e) => {
-      if (!isVerticalDragging) return;
-      
-      const deltaY = e.clientY - startY;
-      let newHeight = initialPanelHeight + deltaY;
-
-      const minHeight = window.innerHeight * 0.3333;
-      const maxHeight = window.innerHeight;
-      
-      newHeight = Math.max(minHeight, Math.min(newHeight, maxHeight));
-      
-      expandablePanel.style.height = `${newHeight}px`;
-      
-      syncCardWidth();
-      updateCurtainPositions(currentDragX);
-    });
-
-    const stopVerticalDrag = (e) => {
-      if (!isVerticalDragging) return;
-      isVerticalDragging = false;
-      try { dragHandle.releasePointerCapture(e.pointerId); } catch (err) {}
-    };
-
-    dragHandle.addEventListener('pointerup', stopVerticalDrag);
-    dragHandle.addEventListener('pointercancel', stopVerticalDrag);
-
-    syncCardWidth();
+    initFixedCardDimensions();
   </script>
 </body>
 </html>
