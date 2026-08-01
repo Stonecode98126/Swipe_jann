@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>窗簾連鎖動畫 - 照片最上層 (85%~100% 透明度)</title>
+  <title>窗簾連鎖動畫 - 照片最上層 (0%~15% 透明度)</title>
   <style>
     * {
       box-sizing: border-box;
@@ -22,13 +22,13 @@
       color: #f8fafc;
     }
 
-    /* 頂部主面板 */
+    /* 頂部主面板：初始高度調降 1/5 (從 33.33vh 降至 26.67vh) */
     .expandable-panel {
       position: absolute;
       top: 0;
       left: 0;
       width: 100vw;
-      height: 33.33vh;
+      height: 26.67vh;
       background: #1e293b;
       box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
       z-index: 10;
@@ -59,7 +59,7 @@
       overflow: hidden;
     }
 
-    /* 【置頂層】選好的相片層 (z-index: 15，蓋在動畫窗簾 L1~L6 上方) */
+    /* 【置頂層】選好的相片層 (z-index: 15，蓋在動畫窗簾 L1~L6 上方，透明度 0%~15%) */
     .stage-bg-layer {
       position: absolute;
       top: 0;
@@ -69,8 +69,8 @@
       background-size: cover;
       background-position: center;
       background-repeat: no-repeat;
-      z-index: 15; /* 蓋在窗簾卡片 (z-index 1~6) 上方 */
-      opacity: 0.95; /* 由 JavaScript 動態控制 0.85 ~ 1.0 */
+      z-index: 15;
+      opacity: 0.05; /* 預設 5% 透明度 (0.05) */
       pointer-events: none;
       transition: opacity 0.1s ease;
     }
@@ -112,11 +112,11 @@
       transition: transform 0.05s linear;
     }
 
-    /* 下方控制區 */
+    /* 下方控制區：初始 padding-top 改為 26.67vh */
     .controls-container {
       width: 100vw;
       height: 100vh;
-      padding-top: 33.33vh;
+      padding-top: 26.67vh;
       padding-left: 16px;
       padding-right: 16px;
       padding-bottom: 20px;
@@ -384,13 +384,13 @@
         <input type="range" id="widthSlider" min="0" max="100" value="0" step="1">
       </div>
 
-      <!-- 【更新】頂層照片透明度滑塊 (85% ~ 100%) -->
+      <!-- 【更新】頂層照片透明度滑塊 (0% ~ 15%) -->
       <div class="slider-item">
         <label for="opacitySlider">
-          <span>頂層照片不透明度 (85% ~ 100%)：</span>
-          <span class="val-badge" id="opacityVal">95%</span>
+          <span>頂層照片不透明度 (0% ~ 15%)：</span>
+          <span class="val-badge" id="opacityVal">5%</span>
         </label>
-        <input type="range" id="opacitySlider" min="85" max="100" value="95" step="1">
+        <input type="range" id="opacitySlider" min="0" max="15" value="5" step="1">
       </div>
     </div>
 
@@ -697,12 +697,12 @@
       updateCurtainPositions(currentDragRatio);
     });
 
-    // 6. 高度滑塊
+    // 6. 高度滑塊：基礎高度改為 26.67vh (減少 1/5)
     heightSlider.addEventListener('input', (e) => {
       const pct = Number(e.target.value);
       heightVal.innerText = `${pct}%`;
 
-      const minVh = 30, maxVh = 70; 
+      const minVh = 26.67, maxVh = 70; 
       const targetVh = minVh + (pct / 100) * (maxVh - minVh);
 
       expandablePanel.style.height = `${targetVh}vh`;
@@ -721,12 +721,12 @@
       updateCurtainPositions(currentDragRatio);
     });
 
-    // 8. 【更新】頂層照片透明度滑塊控制 (85% ~ 100%)
+    // 8. 【更新】頂層照片透明度滑塊控制 (0% ~ 15%)
     opacitySlider.addEventListener('input', (e) => {
       const pct = Number(e.target.value);
       opacityVal.innerText = `${pct}%`;
 
-      // 將 85~100 轉換為 0.85 ~ 1.0 的 opacity 數值
+      // 將 0~15 轉換為 0.0 ~ 0.15 的 opacity 數值
       const opacityValue = pct / 100;
       stageBgLayer.style.opacity = opacityValue;
     });
