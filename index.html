@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>捷安片簾連鎖動畫 背景底圖</title>
+  <title>窗簾連鎖動畫 - 自訂底圖與 0~15% 窗簾透光控制</title>
   <style>
     * {
       box-sizing: border-box;
@@ -59,7 +59,7 @@
       overflow: hidden; /* 確保底圖不溢出外框 */
     }
 
-    /* 上方舞台最下層底圖 */
+    /* 上方舞台最下層底圖（清晰置底，不透明） */
     .stage-bg-layer {
       position: absolute;
       top: 0;
@@ -69,7 +69,7 @@
       background-size: cover;
       background-position: center;
       background-repeat: no-repeat;
-      z-index: 1; /* 最底層，在窗簾 L1~L6 下方 */
+      z-index: 1; /* 最底層，在動畫窗簾 L1~L6 下方 */
       opacity: 1;
     }
 
@@ -84,7 +84,7 @@
       z-index: 5;
     }
 
-    /* 窗簾卡片（設定 10% 透明度） */
+    /* 覆蓋在照片上面的動畫窗簾卡片 */
     .curtain-panel {
       position: absolute;
       top: 0;
@@ -96,9 +96,9 @@
       background-size: 20% 20%;
       background-repeat: repeat;
       background-position: center;
-      background-color: rgba(255, 255, 255, 0.15); /* 基底微亮襯托透明感 */
-      opacity: 0.9; /* 10% 透明度 (90% 不透明) */
-      will-change: transform;
+      background-color: rgba(255, 255, 255, 0.1);
+      opacity: 0.1; /* 由 JavaScript 動態控制 0 ~ 0.15 */
+      will-change: transform, opacity;
       border-left: 2px solid rgba(255, 255, 255, 0.4);
       display: flex;
       align-items: flex-end;
@@ -328,7 +328,7 @@
   <!-- 頂部面板 -->
   <div class="expandable-panel" id="expandablePanel">
     <div class="curtain-track-stage" id="curtainStage">
-      <!-- 外框容器（內含最下層動畫底圖） -->
+      <!-- 外框容器（最下層為照片背景，上方為動畫層） -->
       <div class="max-boundary-frame" id="maxBoundaryFrame">
         <div class="stage-bg-layer" id="stageBgLayer"></div>
       </div>
@@ -380,11 +380,20 @@
         </label>
         <input type="range" id="widthSlider" min="0" max="100" value="0" step="1">
       </div>
+
+      <!-- 【新增】動畫窗簾透光度滑塊 (0% ~ 15%) -->
+      <div class="slider-item">
+        <label for="opacitySlider">
+          <span>窗簾透光度 (動畫層)：</span>
+          <span class="val-badge" id="opacityVal">10%</span>
+        </label>
+        <input type="range" id="opacitySlider" min="0" max="15" value="10" step="1">
+      </div>
     </div>
 
-    <!-- 手機/本機相片上傳區（作為動畫區底圖） -->
+    <!-- 手機/本機相片上傳區（作為動畫區最底層背景） -->
     <div class="custom-upload-box">
-      <span class="picker-label" style="color: #38bdf8;">動畫區底圖 (選取手機相片)</span>
+      <span class="picker-label" style="color: #38bdf8;">動畫區最下層底圖 (選取手機相片)</span>
       <label for="bgImageInput" class="upload-btn-label">📷 從手機/電腦挑選照片</label>
       <input type="file" id="bgImageInput" accept="image/*" style="display: none;">
       <span class="upload-status-text" id="uploadStatus">尚未選擇自訂照片</span>
@@ -418,14 +427,18 @@
 
     const heightSlider = document.getElementById('heightSlider');
     const widthSlider = document.getElementById('widthSlider');
+    const opacitySlider = document.getElementById('opacitySlider');
+    
     const heightVal = document.getElementById('heightVal');
     const widthVal = document.getElementById('widthVal');
+    const opacityVal = document.getElementById('opacityVal');
 
     const btnRightSingle = document.getElementById('btnRightSingle');
     const btnSplitDouble = document.getElementById('btnSplitDouble');
 
     let isDoubleOpen = false;
     let currentDragRatio = 0; 
+    let currentOpacity = 0.10; // 預設 10%
     
     let leftPanels = [];
     let rightPanels = [];
@@ -444,7 +457,7 @@
       stageBgLayer.style.backgroundImage = `url('${imageSrc}')`;
     }
 
-    // 手機/本機照片上傳事件監聽
+    // 上傳圖片處理
     bgImageInput.addEventListener('change', (e) => {
       const file = e.target.files[0];
       if (file) {
@@ -470,6 +483,7 @@
           const panel = document.createElement('div');
           panel.className = 'curtain-panel';
           panel.style.zIndex = i;
+          panel.style.opacity = currentOpacity;
           panel.innerText = `L${i}`;
 
           const imgPath = (i % 2 !== 0) ? selectedOddPath : selectedEvenPath;
@@ -483,6 +497,7 @@
           const panel = document.createElement('div');
           panel.className = 'curtain-panel';
           panel.style.zIndex = i;
+          panel.style.opacity = currentOpacity;
           panel.innerText = `L${i}`;
 
           const imgPath = (i % 2 !== 0) ? selectedOddPath : selectedEvenPath;
@@ -496,6 +511,7 @@
           const panel = document.createElement('div');
           panel.className = 'curtain-panel';
           panel.style.zIndex = i;
+          panel.style.opacity = currentOpacity;
           panel.innerText = `L${i}`;
 
           const imgPath = (i % 2 !== 0) ? selectedOddPath : selectedEvenPath;
@@ -507,7 +523,7 @@
       }
     }
 
-    // 2. 通用 1/3 縮圖選擇器 (單數層 / 雙數層)
+    // 2. 通用 1/3 縮圖選擇器
     function createThumbPicker(container, isOdd, defaultSelectIndex) {
       container.innerHTML = '';
 
@@ -584,7 +600,7 @@
     createThumbPicker(oddScrollBox, true, 0);
     createThumbPicker(evenScrollBox, false, 1);
 
-    // 3. 計算尺寸與邊界，確保固定片（左 L1 / 右 L6）完全顯示
+    // 3. 計算尺寸與邊界
     function initFixedCardDimensions() {
       const stageWidth = curtainStage.clientWidth || window.innerWidth;
       const maxAllowedWidth = stageWidth * 0.88; 
@@ -706,7 +722,20 @@
       updateCurtainPositions(currentDragRatio);
     });
 
-    // 8. 手勢拖曳
+    // 8. 窗簾透光度滑塊 (0% ~ 15%)
+    opacitySlider.addEventListener('input', (e) => {
+      const pct = Number(e.target.value);
+      opacityVal.innerText = `${pct}%`;
+
+      currentOpacity = pct / 100; // 0 ~ 0.15
+
+      // 即時套用至所有窗簾片
+      [...rightPanels, ...leftPanels].forEach(panel => {
+        panel.style.opacity = currentOpacity;
+      });
+    });
+
+    // 9. 手勢拖曳
     let isHorizontalDragging = false;
     let startX = 0;
     let startRatio = 0;
