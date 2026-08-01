@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>窗簾連鎖動畫 - 全域層級概念 (新增底圖背景)</title>
+  <title>窗簾連鎖動畫 - 自訂手機相片背景</title>
   <style>
     * {
       box-sizing: border-box;
@@ -56,7 +56,7 @@
       pointer-events: none;
       z-index: 20;
       transition: all 0.2s ease;
-      overflow: hidden; /* 確保底圖不會溢出外框 */
+      overflow: hidden; /* 確保底圖不溢出外框 */
     }
 
     /* 上方舞台最下層底圖 */
@@ -282,6 +282,42 @@
       color: #38bdf8;
       font-size: 0.85rem;
     }
+
+    /* 自訂圖片上傳區域樣式 */
+    .custom-upload-box {
+      background: #1e293b;
+      padding: 14px;
+      border-radius: 8px;
+      border: 1px dashed #38bdf8;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .upload-btn-label {
+      display: inline-block;
+      background: #38bdf8;
+      color: #0f172a;
+      font-size: 0.85rem;
+      font-weight: bold;
+      padding: 8px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .upload-btn-label:hover {
+      background: #7dd3fc;
+    }
+
+    .upload-status-text {
+      font-size: 0.75rem;
+      color: #94a3b8;
+      word-break: break-all;
+      text-align: center;
+    }
   </style>
 </head>
 <body>
@@ -289,7 +325,7 @@
   <!-- 頂部面板 -->
   <div class="expandable-panel" id="expandablePanel">
     <div class="curtain-track-stage" id="curtainStage">
-      <!-- 外框容器（內含最下層舞台底圖） -->
+      <!-- 外框容器（內含最下層動畫底圖） -->
       <div class="max-boundary-frame" id="maxBoundaryFrame">
         <div class="stage-bg-layer" id="stageBgLayer"></div>
       </div>
@@ -343,10 +379,12 @@
       </div>
     </div>
 
-    <!-- 【新增】控制區最下方：動畫區舞台底圖（背景）選擇器 -->
-    <div class="picker-group" style="margin-top: 4px;">
-      <span class="picker-label" style="color: #38bdf8; font-size: 0.85rem;">舞台底座背景圖 (最下層)</span>
-      <div class="thumb-scroll-box" id="bgScrollBox"></div>
+    <!-- 【新增】手機/本機相片上傳區（作為動畫區底圖） -->
+    <div class="custom-upload-box">
+      <span class="picker-label" style="color: #38bdf8;">動畫區底圖 (選取手機相片)</span>
+      <label for="bgImageInput" class="upload-btn-label">📷 從手機/電腦挑選照片</label>
+      <input type="file" id="bgImageInput" accept="image/*" style="display: none;">
+      <span class="upload-status-text" id="uploadStatus">尚未選擇自訂照片</span>
     </div>
 
   </div>
@@ -372,8 +410,9 @@
     
     const oddScrollBox = document.getElementById('oddScrollBox');
     const evenScrollBox = document.getElementById('evenScrollBox');
-    const bgScrollBox = document.getElementById('bgScrollBox');
-    
+    const bgImageInput = document.getElementById('bgImageInput');
+    const uploadStatus = document.getElementById('uploadStatus');
+
     const heightSlider = document.getElementById('heightSlider');
     const widthSlider = document.getElementById('widthSlider');
     const heightVal = document.getElementById('heightVal');
@@ -390,7 +429,6 @@
 
     let selectedOddPath = `images/${imageNames[0]}${FILE_EXTENSION}`;
     let selectedEvenPath = `images/${imageNames[1] || imageNames[0]}${FILE_EXTENSION}`;
-    let selectedBgPath = `images/${imageNames[2] || imageNames[0]}${FILE_EXTENSION}`;
 
     function updatePanelImage(panel, imagePath) {
       if (!panel) return;
@@ -398,11 +436,25 @@
       panel.style.backgroundImage = `url('${encodedPath}')`;
     }
 
-    function updateStageBgImage(imagePath) {
+    function setStageBgImage(imageSrc) {
       if (!stageBgLayer) return;
-      const encodedPath = encodeURI(imagePath);
-      stageBgLayer.style.backgroundImage = `url('${encodedPath}')`;
+      stageBgLayer.style.backgroundImage = `url('${imageSrc}')`;
     }
+
+    // 手機/本機照片上傳事件監聽
+    bgImageInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = function(evt) {
+          const resultDataUrl = evt.target.result;
+          setStageBgImage(resultDataUrl);
+          uploadStatus.innerText = `已載入相片：${file.name}`;
+          uploadStatus.style.color = '#38bdf8';
+        };
+        reader.readAsDataURL(file);
+      }
+    });
 
     // 1. 動態建立卡片
     function buildCurtains() {
@@ -411,7 +463,6 @@
       rightPanels = [];
 
       if (!isDoubleOpen) {
-        // 【右單開】右側 6 片
         for (let i = 1; i <= 6; i++) {
           const panel = document.createElement('div');
           panel.className = 'curtain-panel';
@@ -425,7 +476,6 @@
           rightPanels.push(panel);
         }
       } else {
-        // 【左右對開】
         for (let i = 1; i <= 6; i++) {
           const panel = document.createElement('div');
           panel.className = 'curtain-panel';
@@ -454,8 +504,8 @@
       }
     }
 
-    // 2. 通用 1/3 縮圖選擇器 (支援 type: 'odd' | 'even' | 'bg')
-    function createThumbPicker(container, type, defaultSelectIndex) {
+    // 2. 通用 1/3 縮圖選擇器 (單數層 / 雙數層)
+    function createThumbPicker(container, isOdd, defaultSelectIndex) {
       container.innerHTML = '';
 
       imageNames.forEach((name, imgIdx) => {
@@ -479,7 +529,7 @@
 
         card.addEventListener('click', () => {
           card.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'start' });
-          applySelection(container, card, type, filePath);
+          applySelection(container, card, isOdd, filePath);
         });
 
         container.appendChild(card);
@@ -504,45 +554,34 @@
           });
 
           if (closestCard && !closestCard.classList.contains('active')) {
-            applySelection(container, closestCard, type, closestCard.dataset.filePath);
+            applySelection(container, closestCard, isOdd, closestCard.dataset.filePath);
           }
         }, 80);
       });
     }
 
-    function applySelection(container, activeCard, type, filePath) {
+    function applySelection(container, activeCard, isOdd, filePath) {
       container.querySelectorAll('.thumb-card').forEach(c => c.classList.remove('active'));
       activeCard.classList.add('active');
 
-      if (type === 'odd') {
+      if (isOdd) {
         selectedOddPath = filePath;
-        updateCurtainImages(true);
-      } else if (type === 'even') {
+      } else {
         selectedEvenPath = filePath;
-        updateCurtainImages(false);
-      } else if (type === 'bg') {
-        selectedBgPath = filePath;
-        updateStageBgImage(filePath);
       }
-    }
 
-    function updateCurtainImages(isOdd) {
-      const targetPath = isOdd ? selectedOddPath : selectedEvenPath;
       [...rightPanels, ...leftPanels].forEach(panel => {
         const layerNum = parseInt(panel.innerText.replace('L', ''));
         if ((layerNum % 2 !== 0 && isOdd) || (layerNum % 2 === 0 && !isOdd)) {
-          updatePanelImage(panel, targetPath);
+          updatePanelImage(panel, filePath);
         }
       });
     }
 
-    // 初始化縮圖選單
-    createThumbPicker(oddScrollBox, 'odd', 0);
-    createThumbPicker(evenScrollBox, 'even', 1);
-    createThumbPicker(bgScrollBox, 'bg', 2);
-    updateStageBgImage(selectedBgPath);
+    createThumbPicker(oddScrollBox, true, 0);
+    createThumbPicker(evenScrollBox, false, 1);
 
-    // 3. 動態計算舞台與縮放，確保全域固定片 (左 L1 / 右 L6) 完整顯示
+    // 3. 計算尺寸與邊界，確保固定片（左 L1 / 右 L6）完全顯示
     function initFixedCardDimensions() {
       const stageWidth = curtainStage.clientWidth || window.innerWidth;
       const maxAllowedWidth = stageWidth * 0.88; 
