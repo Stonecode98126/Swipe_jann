@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>捷安雙開窗簾 (左右各 6 片共 12 片無縫對接) + 1/3 縮圖連動</title>
+  <title>窗簾連鎖帶出動畫 (支援單/雙開 + 1/3 縮圖選單)</title>
   <style>
     * {
       box-sizing: border-box;
@@ -44,26 +44,25 @@
       overflow: hidden;
     }
 
-    /* 外框容器：居中顯示，寬度由 JS 根據 12 片無縫展開精準計算 */
+    /* 外框容器 */
     .max-boundary-frame {
       position: absolute;
       top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
+      transform: translateY(-50%);
       height: 80%;
       border: 3px solid rgba(255, 255, 240, 0.85);
       border-radius: 6px;
       box-shadow: 0 0 12px rgba(255, 255, 240, 0.2);
       pointer-events: none;
       z-index: 20;
+      transition: all 0.2s ease;
     }
 
-    /* 窗簾軌道 Stage */
+    /* 窗簾軌道容器 */
     .curtain-container {
       position: absolute;
       top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
+      transform: translateY(-50%);
       height: 80%;
       cursor: grab;
       touch-action: none;
@@ -114,7 +113,7 @@
       color: #38bdf8;
     }
 
-    /* 縮圖雙欄網格 */
+    /* 縮圖網格 */
     .thumb-picker-grid {
       display: grid;
       grid-template-columns: repeat(2, 1fr);
@@ -202,7 +201,7 @@
       padding: 0 2px;
     }
 
-    /* 滑塊區 */
+    /* 控制與開關設定區 */
     .sliders-section {
       background: #1e293b;
       padding: 16px;
@@ -211,6 +210,45 @@
       display: flex;
       flex-direction: column;
       gap: 16px;
+    }
+
+    .mode-switch-group {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #334155;
+    }
+
+    .mode-switch-group label {
+      font-size: 0.85rem;
+      color: #f8fafc;
+      font-weight: 600;
+    }
+
+    .segmented-control {
+      display: flex;
+      background: #0f172a;
+      padding: 3px;
+      border-radius: 6px;
+      gap: 4px;
+    }
+
+    .segmented-btn {
+      background: transparent;
+      border: none;
+      color: #94a3b8;
+      padding: 6px 12px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .segmented-btn.active {
+      background: #38bdf8;
+      color: #0f172a;
     }
 
     .slider-item {
@@ -243,22 +281,31 @@
 
   <!-- 下方控制區 -->
   <div class="controls-container" id="controlsContainer">
-    <h3 class="controls-title">即時控制面板 (左右雙開各 6 片)</h3>
+    <h3 class="controls-title">即時控制面板</h3>
     
     <!-- 1/3 圖片縮圖選單區 -->
     <div class="thumb-picker-grid">
       <div class="picker-group">
-        <span class="picker-label">單數層 (1, 3, 5, 7, 9, 11)</span>
+        <span class="picker-label">單數層 (L1, L3, L5)</span>
         <div class="thumb-scroll-box" id="oddScrollBox"></div>
       </div>
       <div class="picker-group">
-        <span class="picker-label">雙數層 (2, 4, 6, 8, 10, 12)</span>
+        <span class="picker-label">雙數層 (L2, L4, L6)</span>
         <div class="thumb-scroll-box" id="evenScrollBox"></div>
       </div>
     </div>
 
-    <!-- 控制區滑塊 -->
+    <!-- 控制區設定 -->
     <div class="sliders-section">
+      <!-- 開關方式切換開關 -->
+      <div class="mode-switch-group">
+        <label>開劃方式：</label>
+        <div class="segmented-control">
+          <button class="segmented-btn active" id="btnRightSingle">右開 (單開)</button>
+          <button class="segmented-btn" id="btnSplitDouble">左右對開</button>
+        </div>
+      </div>
+
       <!-- 高度滑塊 -->
       <div class="slider-item">
         <label for="heightSlider">
@@ -271,7 +318,7 @@
       <!-- 寬度滑塊 -->
       <div class="slider-item">
         <label for="widthSlider">
-          <span>總寬度 (左右對開展開):</span>
+          <span>總寬度 (橫向展開):</span>
           <span class="val-badge" id="widthVal">125 cm</span>
         </label>
         <input type="range" id="widthSlider" min="125" max="660" value="125" step="1">
@@ -280,10 +327,6 @@
   </div>
 
   <script>
-    const LEFT_LAYERS = 6;
-    const RIGHT_LAYERS = 6;
-    const TOTAL_LAYERS = LEFT_LAYERS + RIGHT_LAYERS; // 總共 12 片
-
     const FILE_EXTENSION = '.jpg';
 
     const imageNames = [
@@ -308,41 +351,80 @@
     const heightVal = document.getElementById('heightVal');
     const widthVal = document.getElementById('widthVal');
 
-    let currentDragX = 0;
-    const panels = [];
+    const btnRightSingle = document.getElementById('btnRightSingle');
+    const btnSplitDouble = document.getElementById('btnSplitDouble');
 
-    const currentImages = Array.from({ length: TOTAL_LAYERS }, (_, i) => {
-      const defaultName = (i % 2 === 0) ? imageNames[0] : (imageNames[1] || imageNames[0]);
-      return `images/${defaultName}${FILE_EXTENSION}`;
-    });
+    let isDoubleOpen = false; // 是否為對開
+    let currentDragX = 0;
+    
+    // 記錄左右兩邊卡片 DOM 陣列
+    let leftPanels = [];
+    let rightPanels = [];
+
+    // 保存當前圖片選取 (單數層 index 0, 雙數層 index 1)
+    let selectedOddPath = `images/${imageNames[0]}${FILE_EXTENSION}`;
+    let selectedEvenPath = `images/${imageNames[1] || imageNames[0]}${FILE_EXTENSION}`;
 
     function updatePanelImage(panel, imagePath) {
       if (!panel) return;
       const encodedPath = encodeURI(imagePath);
       panel.style.backgroundImage = `url('${encodedPath}')`;
-      panel.style.display = 'none';
-      panel.offsetHeight;
-      panel.style.display = 'flex';
     }
 
-    // 1. 初始化 12 片窗簾卡片 (左 6 片 L1~L6，右 6 片 L7~L12)
-    function initCurtains() {
+    // 1. 動態建立卡片 (右單開: 6片; 左右對開: 左6片 + 右6片)
+    function buildCurtains() {
       curtainTrack.innerHTML = '';
-      for (let i = 0; i < TOTAL_LAYERS; i++) {
-        const panel = document.createElement('div');
-        panel.className = 'curtain-panel';
-        panel.style.zIndex = (i < 6) ? (i + 1) : (12 - i); // 確保疊加層級正確
-        panel.innerText = `L${i + 1}`;
-        
-        curtainTrack.appendChild(panel);
-        panels.push(panel);
+      leftPanels = [];
+      rightPanels = [];
 
-        updatePanelImage(panel, currentImages[i]);
+      if (!isDoubleOpen) {
+        // 【右單開】右側 6 片 (L1 底層固定在最右, L6 在最上層)
+        for (let i = 1; i <= 6; i++) {
+          const panel = document.createElement('div');
+          panel.className = 'curtain-panel';
+          panel.style.zIndex = i; // L1=1, L6=6
+          panel.innerText = `L${i}`;
+
+          const imgPath = (i % 2 !== 0) ? selectedOddPath : selectedEvenPath;
+          updatePanelImage(panel, imgPath);
+
+          curtainTrack.appendChild(panel);
+          rightPanels.push(panel);
+        }
+      } else {
+        // 【左右對開】
+        // 1. 左側 6 片 (L1 在最左側底層，L6 在最上面)
+        for (let i = 1; i <= 6; i++) {
+          const panel = document.createElement('div');
+          panel.className = 'curtain-panel';
+          panel.style.zIndex = i;
+          panel.innerText = `L${i}`;
+
+          const imgPath = (i % 2 !== 0) ? selectedOddPath : selectedEvenPath;
+          updatePanelImage(panel, imgPath);
+
+          curtainTrack.appendChild(panel);
+          leftPanels.push(panel);
+        }
+
+        // 2. 右側 6 片 (L1 在最右側底層，L6 在最上面)
+        for (let i = 1; i <= 6; i++) {
+          const panel = document.createElement('div');
+          panel.className = 'curtain-panel';
+          panel.style.zIndex = i;
+          panel.innerText = `L${i}`;
+
+          const imgPath = (i % 2 !== 0) ? selectedOddPath : selectedEvenPath;
+          updatePanelImage(panel, imgPath);
+
+          curtainTrack.appendChild(panel);
+          rightPanels.push(panel);
+        }
       }
     }
 
-    // 2. 生成 1/3 縮圖滑動選單 (單數 1,3,5,7,9,11 / 雙數 2,4,6,8,10,12)
-    function createThumbPicker(container, targetIndices, defaultSelectIndex) {
+    // 2. 1/3 縮圖選擇器
+    function createThumbPicker(container, isOdd, defaultSelectIndex) {
       container.innerHTML = '';
 
       imageNames.forEach((name, imgIdx) => {
@@ -366,7 +448,7 @@
 
         card.addEventListener('click', () => {
           card.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'start' });
-          applySelection(container, card, targetIndices, filePath);
+          applySelection(container, card, isOdd, filePath);
         });
 
         container.appendChild(card);
@@ -391,82 +473,141 @@
           });
 
           if (closestCard && !closestCard.classList.contains('active')) {
-            applySelection(container, closestCard, targetIndices, closestCard.dataset.filePath);
+            applySelection(container, closestCard, isOdd, closestCard.dataset.filePath);
           }
         }, 80);
       });
     }
 
-    function applySelection(container, activeCard, targetIndices, filePath) {
+    function applySelection(container, activeCard, isOdd, filePath) {
       container.querySelectorAll('.thumb-card').forEach(c => c.classList.remove('active'));
       activeCard.classList.add('active');
 
-      targetIndices.forEach(idx => {
-        currentImages[idx] = filePath;
-        updatePanelImage(panels[idx], filePath);
-      });
-    }
+      if (isOdd) {
+        selectedOddPath = filePath;
+      } else {
+        selectedEvenPath = filePath;
+      }
 
-    initCurtains();
-    // 單數層包含：0, 2, 4, 6, 8, 10 (L1, L3, L5, L7, L9, L11)
-    createThumbPicker(oddScrollBox, [0, 2, 4, 6, 8, 10], 0);
-    // 雙數層包含：1, 3, 5, 7, 9, 11 (L2, L4, L6, L8, L10, L12)
-    createThumbPicker(evenScrollBox, [1, 3, 5, 7, 9, 11], 1);
+      // 同步更新當前畫面上所有單/雙數層
+      const allRight = rightPanels;
+      const allLeft = leftPanels;
 
-    // 3. 計算舞台與無縫外框總寬度 (以 12 片全開重疊極限精準計算)
-    function initFixedCardDimensions() {
-      const stageHeight = curtainTrack.getBoundingClientRect().height || (window.innerHeight * 0.3333 * 0.8);
-      const singleCardWidth = stageHeight / 4.5; // 單片寬度
-      
-      curtainTrack.style.width = `${singleCardWidth}px`;
-
-      const hookThreshold = singleCardWidth * (11 / 12);
-      
-      // 12 片完全開合無縫連鎖時的總寬度：單片寬 + (Hook間距 * 11)
-      const maxTotalWidth = singleCardWidth + (hookThreshold * 11);
-      
-      maxBoundaryFrame.style.width = `${maxTotalWidth}px`;
-      
-      const borderWidth = Math.max(2, Math.round(singleCardWidth / 30));
-      maxBoundaryFrame.style.borderWidth = `${borderWidth}px`;
-    }
-
-    // 4. 左右各 6 片對開滑動邏輯 (L1在最左外框，L12在最右外框，全開時 L6與L7 在中間完美密合)
-    function updateCurtainPositions(dragDistance) {
-      const panelWidth = curtainTrack.getBoundingClientRect().width;
-      const hookThreshold = panelWidth * (11 / 12);
-
-      // 單側 6 片的最大展開距離
-      const maxHalfDrag = hookThreshold * 5; 
-      const clampedDrag = Math.max(0, Math.min(dragDistance, maxHalfDrag));
-
-      // 計算中心基準 (總寬度的一半 = hookThreshold * 5.5)
-      const centerBoundaryOffset = hookThreshold * 5.5;
-
-      panels.forEach((panel, index) => {
-        if (index < 6) {
-          // 【左側群組 L1 ~ L6】
-          // L1 固定在最左側外框：-centerBoundaryOffset
-          // 當向中間拉時，L2~L6 依序向右滑出，全開時 L6 抵達中間 (0px 位置)
-          const leftBaseFixed = -centerBoundaryOffset; 
-          const hookOffset = (5 - index) * hookThreshold;
-          const moveDist = Math.max(0, clampedDrag - hookOffset);
-          
-          panel.style.transform = `translateX(${leftBaseFixed + moveDist}px)`;
-        } else {
-          // 【右側群組 L7 ~ L12】
-          // L12 固定在最右側外框：+centerBoundaryOffset
-          // 當向中間拉時，L11~L7 依序向左滑出，全開時 L7 抵達中間 (0px 位置)
-          const rightBaseFixed = centerBoundaryOffset; 
-          const hookOffset = (index - 6) * hookThreshold;
-          const moveDist = Math.max(0, clampedDrag - hookOffset);
-          
-          panel.style.transform = `translateX(${rightBaseFixed - moveDist}px)`;
+      [...allRight, ...allLeft].forEach(panel => {
+        const layerNum = parseInt(panel.innerText.replace('L', ''));
+        if ((layerNum % 2 !== 0 && isOdd) || (layerNum % 2 === 0 && !isOdd)) {
+          updatePanelImage(panel, filePath);
         }
       });
     }
 
-    // 5. 高度滑塊控制
+    createThumbPicker(oddScrollBox, true, 0);
+    createThumbPicker(evenScrollBox, false, 1);
+
+    // 3. 調整舞台尺寸與外框計算
+    function initFixedCardDimensions() {
+      const stageHeight = curtainTrack.getBoundingClientRect().height || (window.innerHeight * 0.3333 * 0.8);
+      const singleCardWidth = stageHeight / 4.5;
+      
+      curtainTrack.style.width = `${singleCardWidth}px`;
+      const hookThreshold = singleCardWidth * (11 / 12);
+
+      if (!isDoubleOpen) {
+        // 【單開】6片展開極限
+        const maxTotalWidth = singleCardWidth + (hookThreshold * 5);
+        maxBoundaryFrame.style.width = `${maxTotalWidth}px`;
+        maxBoundaryFrame.style.left = 'auto';
+        maxBoundaryFrame.style.right = '5vw';
+        maxBoundaryFrame.style.transform = 'translateY(-50%)';
+
+        curtainTrack.style.left = 'auto';
+        curtainTrack.style.right = '5vw';
+        curtainTrack.style.transform = 'translateY(-50%)';
+      } else {
+        // 【對開】12片兩側完全平鋪無縫合攏總寬：單片寬 + (hookThreshold * 11)
+        const maxTotalWidth = singleCardWidth + (hookThreshold * 11);
+        maxBoundaryFrame.style.width = `${maxTotalWidth}px`;
+        maxBoundaryFrame.style.left = '50%';
+        maxBoundaryFrame.style.right = 'auto';
+        maxBoundaryFrame.style.transform = 'translate(-50%, -50%)';
+
+        curtainTrack.style.left = '50%';
+        curtainTrack.style.right = 'auto';
+        curtainTrack.style.transform = 'translate(-50%, -50%)';
+      }
+
+      const borderWidth = Math.max(2, Math.round(singleCardWidth / 30));
+      maxBoundaryFrame.style.borderWidth = `${borderWidth}px`;
+    }
+
+    // 4. 一片帶出一片（Hook連鎖卡扣）物理與動態位置計算
+    function updateCurtainPositions(dragDistance) {
+      const panelWidth = curtainTrack.getBoundingClientRect().width;
+      const hookThreshold = panelWidth * (11 / 12);
+      const maxDragOneSide = hookThreshold * 5; // 單側 6 片極限拉伸距離
+
+      if (!isDoubleOpen) {
+        // === 右單開模式 ===
+        // 拖曳 L6 (最上層/最左邊)，到達極限帶動 L5 -> L4 -> L3 -> L2 -> L1(固定)
+        const clampedDrag = Math.max(0, Math.min(dragDistance, maxDragOneSide));
+
+        rightPanels.forEach((panel, idx) => {
+          // idx: 0(L1), 1(L2), 2(L3), 3(L4), 4(L5), 5(L6)
+          if (idx === 0) {
+            panel.style.transform = `translateX(0px)`; // L1 固定
+            return;
+          }
+          // Hook 帶動邏輯：L6 移動超過距離時才連動帶出 L5...
+          const hookOffset = (5 - idx) * hookThreshold;
+          const moveDist = Math.max(0, clampedDrag - hookOffset);
+          panel.style.transform = `translateX(${-moveDist}px)`;
+        });
+      } else {
+        // === 左右對開模式 ===
+        // 單側最大距離為 maxDragOneSide
+        const clampedDrag = Math.max(0, Math.min(dragDistance, maxDragOneSide));
+        const centerOffset = hookThreshold * 5.5; // 對開置中距離
+
+        // 【右側 6 片】L1 在最右外框(固定)，L6 由最右拉向中間
+        rightPanels.forEach((panel, idx) => {
+          // idx: 0(L1), 1(L2), 2(L3), 3(L4), 4(L5), 5(L6)
+          const baseRightFixed = centerOffset;
+          const hookOffset = (5 - idx) * hookThreshold;
+          const moveDist = Math.max(0, clampedDrag - hookOffset);
+          panel.style.transform = `translateX(${baseRightFixed - moveDist}px)`;
+        });
+
+        // 【左側 6 片】L1 在最左外框(固定)，L6 由最左拉向中間
+        leftPanels.forEach((panel, idx) => {
+          // idx: 0(L1), 1(L2), 2(L3), 3(L4), 4(L5), 5(L6)
+          const baseLeftFixed = -centerOffset;
+          const hookOffset = (5 - idx) * hookThreshold;
+          const moveDist = Math.max(0, clampedDrag - hookOffset);
+          panel.style.transform = `translateX(${baseLeftFixed + moveDist}px)`;
+        });
+      }
+    }
+
+    // 5. 切換單/雙開
+    btnRightSingle.addEventListener('click', () => {
+      isDoubleOpen = false;
+      btnRightSingle.classList.add('active');
+      btnSplitDouble.classList.remove('active');
+      buildCurtains();
+      initFixedCardDimensions();
+      updateCurtainPositions(currentDragX);
+    });
+
+    btnSplitDouble.addEventListener('click', () => {
+      isDoubleOpen = true;
+      btnSplitDouble.classList.add('active');
+      btnRightSingle.classList.remove('active');
+      buildCurtains();
+      initFixedCardDimensions();
+      updateCurtainPositions(currentDragX);
+    });
+
+    // 6. 高度滑塊
     heightSlider.addEventListener('input', (e) => {
       const cmVal = Number(e.target.value);
       heightVal.innerText = `${cmVal} cm`;
@@ -482,23 +623,23 @@
       updateCurtainPositions(currentDragX);
     });
 
-    // 6. 寬度滑塊控制
+    // 7. 寬度滑塊
     widthSlider.addEventListener('input', (e) => {
       const cmVal = Number(e.target.value);
       widthVal.innerText = `${cmVal} cm`;
 
       const panelWidth = curtainTrack.getBoundingClientRect().width;
       const hookThreshold = panelWidth * (11 / 12);
-      const maxHalfDrag = hookThreshold * 5;
+      const maxDragOneSide = hookThreshold * 5;
 
       const minCm = 125, maxCm = 660;
       const ratio = (cmVal - minCm) / (maxCm - minCm);
 
-      currentDragX = ratio * maxHalfDrag;
+      currentDragX = ratio * maxDragOneSide;
       updateCurtainPositions(currentDragX);
     });
 
-    // 7. 頂部窗簾滑動手勢
+    // 8. 手勢拖曳連動
     let isHorizontalDragging = false;
     let startX = 0;
     let lastSavedDragX = 0;
@@ -516,10 +657,10 @@
 
       const panelWidth = curtainTrack.getBoundingClientRect().width;
       const hookThreshold = panelWidth * (11 / 12);
-      const maxHalfDrag = hookThreshold * 5;
+      const maxDragOneSide = hookThreshold * 5;
 
-      const clampedDrag = Math.max(0, Math.min(currentDragX, maxHalfDrag));
-      const ratio = clampedDrag / (maxHalfDrag || 1);
+      const clampedDrag = Math.max(0, Math.min(currentDragX, maxDragOneSide));
+      const ratio = clampedDrag / (maxDragOneSide || 1);
       
       const minCm = 125, maxCm = 660;
       const calculatedCm = Math.round(minCm + ratio * (maxCm - minCm));
@@ -540,6 +681,8 @@
     curtainTrack.addEventListener('pointerup', stopHorizontalDrag);
     curtainTrack.addEventListener('pointercancel', stopHorizontalDrag);
 
+    // 初始化執行
+    buildCurtains();
     initFixedCardDimensions();
     updateCurtainPositions(0);
   </script>
