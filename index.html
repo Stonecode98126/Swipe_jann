@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>捷安片簾動畫示意 (動態連動下方控制區)</title>
+  <title>頂部窗簾動畫 + 下方縮圖選單</title>
   <style>
     * {
       box-sizing: border-box;
@@ -22,13 +22,13 @@
       color: #f8fafc;
     }
 
-    /* 頂部主面板 */
+    /* 頂部主面板 (保持原樣) */
     .expandable-panel {
       position: absolute;
       top: 0;
       left: 0;
       width: 100vw;
-      height: 33.33vh; /* 預設 1/3 高度 */
+      height: 33.33vh;
       background: #1e293b;
       box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
       z-index: 10;
@@ -37,7 +37,6 @@
       transition: height 0.05s ease-out;
     }
 
-    /* 動畫舞台 */
     .curtain-track-stage {
       position: relative;
       width: 100%;
@@ -45,7 +44,6 @@
       overflow: hidden;
     }
 
-    /* 最大拉伸乳白色外框 */
     .max-boundary-frame {
       position: absolute;
       top: 50%;
@@ -59,7 +57,6 @@
       z-index: 20;
     }
 
-    /* 窗簾層級容器 */
     .curtain-container {
       position: absolute;
       top: 50%;
@@ -79,11 +76,9 @@
       height: 100%;
       border-radius: 4px;
       box-shadow: -6px 0 15px rgba(0, 0, 0, 0.4);
-      
       background-size: 20% 20%;
       background-repeat: repeat;
       background-position: center;
-
       will-change: transform;
       border-left: 2px solid rgba(255, 255, 255, 0.3);
       display: flex;
@@ -95,19 +90,19 @@
       text-shadow: 0 2px 4px rgba(0,0,0,0.9);
     }
 
-    /* 下方控制區：使用 transition 配合 JavaScript 動態調整 padding-top */
+    /* 下方控制區 */
     .controls-container {
       width: 100vw;
       height: 100vh;
-      padding-top: 33.33vh; /* 初始避開頂部面板，後續由 JS 即時更新 */
-      padding-left: 20px;
-      padding-right: 20px;
+      padding-top: 33.33vh;
+      padding-left: 16px;
+      padding-right: 16px;
       padding-bottom: 20px;
       overflow-y: auto;
       box-sizing: border-box;
       display: flex;
       flex-direction: column;
-      gap: 20px;
+      gap: 16px;
       transition: padding-top 0.05s ease-out;
     }
 
@@ -116,39 +111,95 @@
       color: #38bdf8;
     }
 
-    /* 雙選單網格 */
-    .select-grid {
+    /* 縮圖選單區雙欄網格 (寬度對應手機版下拉選單) */
+    .thumb-picker-grid {
       display: grid;
       grid-template-columns: repeat(2, 1fr);
-      gap: 16px;
+      gap: 12px;
     }
 
-    .control-group {
+    .picker-group {
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      gap: 6px;
+      min-width: 0; /* 防止網格被撐開 */
     }
 
-    .control-group label {
-      font-size: 0.85rem;
+    .picker-label {
+      font-size: 0.8rem;
       color: #cbd5e1;
       font-weight: 600;
+    }
+
+    /* 橫向滑動容器 */
+    .thumb-scroll-box {
+      width: 100%;
       display: flex;
-      justify-content: space-between;
+      gap: 8px;
+      overflow-x: auto;
+      padding-bottom: 6px;
+      scroll-snap-type: x mandatory;
+      -webkit-overflow-scrolling: touch;
     }
 
-    .control-group select {
-      background: #334155;
-      color: #fff;
-      border: 1px solid #475569;
-      padding: 10px;
+    /* 自訂平滑滑動條 */
+    .thumb-scroll-box::-webkit-scrollbar {
+      height: 4px;
+    }
+    .thumb-scroll-box::-webkit-scrollbar-thumb {
+      background: #475569;
+      border-radius: 2px;
+    }
+
+    /* 單張小縮圖卡片：寬度 100% (對應欄寬)，高度為寬度的 2 倍 */
+    .thumb-card {
+      flex: 0 0 100%; /* 寬度完全卡住選單欄寬 */
+      aspect-ratio: 1 / 2; /* 高度為寬度的 2 倍 */
+      background: #0f172a;
+      border: 2px solid #334155;
       border-radius: 6px;
-      font-size: 0.85rem;
-      outline: none;
+      overflow: hidden;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      transition: all 0.2s ease;
+      scroll-snap-align: start;
     }
 
-    .control-group select:focus {
+    .thumb-card:hover {
+      border-color: #64748b;
+    }
+
+    /* 選中狀態高亮 */
+    .thumb-card.active {
       border-color: #38bdf8;
+      box-shadow: 0 0 8px rgba(56, 189, 248, 0.4);
+    }
+
+    /* 卡片裡面的縮圖區 */
+    .thumb-img {
+      width: 100%;
+      flex: 1;
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+    }
+
+    /* 下方檔名標籤 */
+    .thumb-name {
+      height: 24px;
+      width: 100%;
+      background: rgba(30, 41, 59, 0.9);
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.75rem;
+      color: #f8fafc;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      padding: 0 4px;
     }
 
     /* 滑塊樣式區 */
@@ -182,13 +233,11 @@
 </head>
 <body>
 
-  <!-- 頂部面板 -->
+  <!-- 頂部面板 (保持原本互扣動畫不動) -->
   <div class="expandable-panel" id="expandablePanel">
     <div class="curtain-track-stage">
       <div class="max-boundary-frame" id="maxBoundaryFrame"></div>
-      <div class="curtain-container" id="curtainTrack">
-        <!-- 6 層卡片 -->
-      </div>
+      <div class="curtain-container" id="curtainTrack"></div>
     </div>
   </div>
 
@@ -196,21 +245,20 @@
   <div class="controls-container" id="controlsContainer">
     <h3 class="controls-title">即時控制面板</h3>
     
-    <!-- 1. 圖片選擇下拉選單 -->
-    <div class="select-grid">
-      <div class="control-group">
-        <label for="oddSelect">單數層 (1, 3, 5)</label>
-        <select id="oddSelect"></select>
+    <!-- 圖片滑動選擇區 (替代原選單，1:2 比例小縮圖 + 檔名) -->
+    <div class="thumb-picker-grid">
+      <div class="picker-group">
+        <span class="picker-label">單數層 (1, 3, 5)</span>
+        <div class="thumb-scroll-box" id="oddScrollBox"></div>
       </div>
-      <div class="control-group">
-        <label for="evenSelect">雙數層 (2, 4, 6)</label>
-        <select id="evenSelect"></select>
+      <div class="picker-group">
+        <span class="picker-label">雙數層 (2, 4, 6)</span>
+        <div class="thumb-scroll-box" id="evenScrollBox"></div>
       </div>
     </div>
 
-    <!-- 2. 手動滑塊區 -->
+    <!-- 手動滑塊區 -->
     <div class="sliders-section">
-      <!-- 垂直高度滑塊 -->
       <div class="slider-item">
         <label for="heightSlider">
           <span>高度 (垂直單獨拉伸):</span>
@@ -219,7 +267,6 @@
         <input type="range" id="heightSlider" min="232" max="292" value="232" step="1">
       </div>
 
-      <!-- 橫向寬度滑塊 -->
       <div class="slider-item">
         <label for="widthSlider">
           <span>寬度 (橫向展開):</span>
@@ -248,8 +295,8 @@
     const expandablePanel = document.getElementById('expandablePanel');
     const controlsContainer = document.getElementById('controlsContainer');
     
-    const oddSelect = document.getElementById('oddSelect');
-    const evenSelect = document.getElementById('evenSelect');
+    const oddScrollBox = document.getElementById('oddScrollBox');
+    const evenScrollBox = document.getElementById('evenScrollBox');
     
     const heightSlider = document.getElementById('heightSlider');
     const widthSlider = document.getElementById('widthSlider');
@@ -273,7 +320,7 @@
       panel.style.display = 'flex';
     }
 
-    // 1. 初始化卡片
+    // 1. 初始化頂部 6 層互扣窗簾卡片
     function initCurtains() {
       curtainTrack.innerHTML = '';
       for (let i = 0; i < TOTAL_LAYERS; i++) {
@@ -289,50 +336,50 @@
       }
     }
 
-    // 2. 初始化下拉選單
-    function initSelectors() {
-      oddSelect.innerHTML = '';
-      evenSelect.innerHTML = '';
+    // 2. 動態生成小縮圖橫向滑動選單 (1:2 比例 + 檔名)
+    function createThumbPicker(container, targetIndices, defaultSelectIndex) {
+      container.innerHTML = '';
 
-      imageNames.forEach((name) => {
+      imageNames.forEach((name, imgIdx) => {
         const filePath = `images/${name}${FILE_EXTENSION}`;
+        const encodedPath = encodeURI(filePath);
 
-        const optOdd = document.createElement('option');
-        optOdd.value = filePath;
-        optOdd.innerText = name;
-        oddSelect.appendChild(optOdd);
+        const card = document.createElement('div');
+        card.className = `thumb-card ${imgIdx === defaultSelectIndex ? 'active' : ''}`;
 
-        const optEven = document.createElement('option');
-        optEven.value = filePath;
-        optEven.innerText = name;
-        evenSelect.appendChild(optEven);
-      });
+        // 縮圖部分
+        const imgDiv = document.createElement('div');
+        imgDiv.className = 'thumb-img';
+        imgDiv.style.backgroundImage = `url('${encodedPath}')`;
 
-      if (imageNames.length > 1) {
-        evenSelect.selectedIndex = 1;
-      }
+        // 檔名部分
+        const nameDiv = document.createElement('div');
+        nameDiv.className = 'thumb-name';
+        nameDiv.innerText = name;
 
-      oddSelect.addEventListener('change', (e) => {
-        const path = e.target.value;
-        [0, 2, 4].forEach(idx => {
-          currentImages[idx] = path;
-          updatePanelImage(panels[idx], path);
+        card.appendChild(imgDiv);
+        card.appendChild(nameDiv);
+
+        // 點擊更新頂部窗簾
+        card.addEventListener('click', () => {
+          container.querySelectorAll('.thumb-card').forEach(c => c.classList.remove('active'));
+          card.classList.add('active');
+
+          targetIndices.forEach(idx => {
+            currentImages[idx] = filePath;
+            updatePanelImage(panels[idx], filePath);
+          });
         });
-      });
 
-      evenSelect.addEventListener('change', (e) => {
-        const path = e.target.value;
-        [1, 3, 5].forEach(idx => {
-          currentImages[idx] = path;
-          updatePanelImage(panels[idx], path);
-        });
+        container.appendChild(card);
       });
     }
 
     initCurtains();
-    initSelectors();
+    createThumbPicker(oddScrollBox, [0, 2, 4], 0);
+    createThumbPicker(evenScrollBox, [1, 3, 5], 1);
 
-    // 3. 固定卡片寬度計算
+    // 3. 原頂部動態互扣計算
     function initFixedCardDimensions() {
       const stageHeight = curtainTrack.getBoundingClientRect().height || (window.innerHeight * 0.3333 * 0.8);
       const singleCardWidth = stageHeight / 4.5;
@@ -369,7 +416,7 @@
       });
     }
 
-    // 4. 高度滑塊：同步連動下方控制區的位置
+    // 4. 高度滑塊：同步避開頂部面板
     heightSlider.addEventListener('input', (e) => {
       const cmVal = Number(e.target.value);
       heightVal.innerText = `${cmVal} cm`;
@@ -379,10 +426,7 @@
       const minVh = 30, maxVh = 70; 
       const targetVh = minVh + percentRatio * (maxVh - minVh);
 
-      // 1) 調整頂部面板高度
       expandablePanel.style.height = `${targetVh}vh`;
-
-      // 2) 同步將下方控制區的 padding-top 設為相同的 vh 值，讓控制區往下移
       controlsContainer.style.paddingTop = `${targetVh}vh`;
 
       updateCurtainPositions(currentDragX);
@@ -404,7 +448,7 @@
       updateCurtainPositions(currentDragX);
     });
 
-    // 6. 滑鼠/觸控拖曳同步
+    // 6. 滑鼠/觸控拖曳
     let isHorizontalDragging = false;
     let startX = 0;
     let lastSavedDragX = 0;
