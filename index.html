@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>頂部窗簾動畫 + 下方縮圖選單</title>
+  <title>頂部窗簾動畫 + 1/3 縮圖自動滑動連動</title>
   <style>
     * {
       box-sizing: border-box;
@@ -22,7 +22,7 @@
       color: #f8fafc;
     }
 
-    /* 頂部主面板 (保持原樣) */
+    /* 頂部主面板 (保持不動) */
     .expandable-panel {
       position: absolute;
       top: 0;
@@ -111,7 +111,7 @@
       color: #38bdf8;
     }
 
-    /* 縮圖選單區雙欄網格 (寬度對應手機版下拉選單) */
+    /* 縮圖雙欄網格 */
     .thumb-picker-grid {
       display: grid;
       grid-template-columns: repeat(2, 1fr);
@@ -122,7 +122,7 @@
       display: flex;
       flex-direction: column;
       gap: 6px;
-      min-width: 0; /* 防止網格被撐開 */
+      min-width: 0;
     }
 
     .picker-label {
@@ -140,9 +140,10 @@
       padding-bottom: 6px;
       scroll-snap-type: x mandatory;
       -webkit-overflow-scrolling: touch;
+      scroll-behavior: smooth;
     }
 
-    /* 自訂平滑滑動條 */
+    /* 平滑滾動條 */
     .thumb-scroll-box::-webkit-scrollbar {
       height: 4px;
     }
@@ -151,10 +152,10 @@
       border-radius: 2px;
     }
 
-    /* 單張小縮圖卡片：寬度 100% (對應欄寬)，高度為寬度的 2 倍 */
+    /* 單張小縮圖卡片：寬度 1/3 (減去 gap)，高度為寬度的 2 倍 */
     .thumb-card {
-      flex: 0 0 100%; /* 寬度完全卡住選單欄寬 */
-      aspect-ratio: 1 / 2; /* 高度為寬度的 2 倍 */
+      flex: 0 0 calc((100% - 16px) / 3); /* 剛好顯示 1/3 的寬度 */
+      aspect-ratio: 1 / 2;               /* 高度為寬度的 2 倍 */
       background: #0f172a;
       border: 2px solid #334155;
       border-radius: 6px;
@@ -162,7 +163,7 @@
       cursor: pointer;
       display: flex;
       flex-direction: column;
-      transition: all 0.2s ease;
+      transition: border-color 0.2s, transform 0.2s, box-shadow 0.2s;
       scroll-snap-align: start;
     }
 
@@ -170,13 +171,13 @@
       border-color: #64748b;
     }
 
-    /* 選中狀態高亮 */
+    /* 滑動選中時的高亮效果 */
     .thumb-card.active {
       border-color: #38bdf8;
-      box-shadow: 0 0 8px rgba(56, 189, 248, 0.4);
+      box-shadow: 0 0 10px rgba(56, 189, 248, 0.5);
+      transform: scale(1.02);
     }
 
-    /* 卡片裡面的縮圖區 */
     .thumb-img {
       width: 100%;
       flex: 1;
@@ -185,24 +186,23 @@
       background-repeat: no-repeat;
     }
 
-    /* 下方檔名標籤 */
     .thumb-name {
-      height: 24px;
+      height: 22px;
       width: 100%;
       background: rgba(30, 41, 59, 0.9);
       border-top: 1px solid rgba(255, 255, 255, 0.1);
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 0.75rem;
+      font-size: 0.68rem;
       color: #f8fafc;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      padding: 0 4px;
+      padding: 0 2px;
     }
 
-    /* 滑塊樣式區 */
+    /* 滑塊區 */
     .sliders-section {
       background: #1e293b;
       padding: 16px;
@@ -233,7 +233,7 @@
 </head>
 <body>
 
-  <!-- 頂部面板 (保持原本互扣動畫不動) -->
+  <!-- 頂部面板 -->
   <div class="expandable-panel" id="expandablePanel">
     <div class="curtain-track-stage">
       <div class="max-boundary-frame" id="maxBoundaryFrame"></div>
@@ -245,7 +245,7 @@
   <div class="controls-container" id="controlsContainer">
     <h3 class="controls-title">即時控制面板</h3>
     
-    <!-- 圖片滑動選擇區 (替代原選單，1:2 比例小縮圖 + 檔名) -->
+    <!-- 1/3 寬度圖片滑動選擇區 -->
     <div class="thumb-picker-grid">
       <div class="picker-group">
         <span class="picker-label">單數層 (1, 3, 5)</span>
@@ -336,7 +336,7 @@
       }
     }
 
-    // 2. 動態生成小縮圖橫向滑動選單 (1:2 比例 + 檔名)
+    // 2. 生成 1/3 縮圖並加入「手指滑動連動動畫」
     function createThumbPicker(container, targetIndices, defaultSelectIndex) {
       container.innerHTML = '';
 
@@ -346,13 +346,13 @@
 
         const card = document.createElement('div');
         card.className = `thumb-card ${imgIdx === defaultSelectIndex ? 'active' : ''}`;
+        card.dataset.filePath = filePath;
+        card.dataset.imgIdx = imgIdx;
 
-        // 縮圖部分
         const imgDiv = document.createElement('div');
         imgDiv.className = 'thumb-img';
         imgDiv.style.backgroundImage = `url('${encodedPath}')`;
 
-        // 檔名部分
         const nameDiv = document.createElement('div');
         nameDiv.className = 'thumb-name';
         nameDiv.innerText = name;
@@ -360,18 +360,50 @@
         card.appendChild(imgDiv);
         card.appendChild(nameDiv);
 
-        // 點擊更新頂部窗簾
+        // 點擊事件：手動點選
         card.addEventListener('click', () => {
-          container.querySelectorAll('.thumb-card').forEach(c => c.classList.remove('active'));
-          card.classList.add('active');
-
-          targetIndices.forEach(idx => {
-            currentImages[idx] = filePath;
-            updatePanelImage(panels[idx], filePath);
-          });
+          card.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'start' });
+          applySelection(container, card, targetIndices, filePath);
         });
 
         container.appendChild(card);
+      });
+
+      // 手指滑動監聽（帶防抖 debounce 提升效能）
+      let scrollTimer = null;
+      container.addEventListener('scroll', () => {
+        clearTimeout(scrollTimer);
+        scrollTimer = setTimeout(() => {
+          const cards = Array.from(container.querySelectorAll('.thumb-card'));
+          const containerLeft = container.getBoundingClientRect().left;
+
+          // 尋求離左邊界最近的縮圖作為選定對象
+          let closestCard = cards[0];
+          let minDistance = Infinity;
+
+          cards.forEach(card => {
+            const distance = Math.abs(card.getBoundingClientRect().left - containerLeft);
+            if (distance < minDistance) {
+              minDistance = distance;
+              closestCard = card;
+            }
+          });
+
+          if (closestCard && !closestCard.classList.contains('active')) {
+            applySelection(container, closestCard, targetIndices, closestCard.dataset.filePath);
+          }
+        }, 80); // 滑動停止 80ms 後自動切換
+      });
+    }
+
+    // 更新選中狀態與頂部窗簾
+    function applySelection(container, activeCard, targetIndices, filePath) {
+      container.querySelectorAll('.thumb-card').forEach(c => c.classList.remove('active'));
+      activeCard.classList.add('active');
+
+      targetIndices.forEach(idx => {
+        currentImages[idx] = filePath;
+        updatePanelImage(panels[idx], filePath);
       });
     }
 
@@ -416,7 +448,7 @@
       });
     }
 
-    // 4. 高度滑塊：同步避開頂部面板
+    // 4. 高度滑塊控制
     heightSlider.addEventListener('input', (e) => {
       const cmVal = Number(e.target.value);
       heightVal.innerText = `${cmVal} cm`;
@@ -448,7 +480,7 @@
       updateCurtainPositions(currentDragX);
     });
 
-    // 6. 滑鼠/觸控拖曳
+    // 6. 頂部窗簾滑鼠/觸控手勢
     let isHorizontalDragging = false;
     let startX = 0;
     let lastSavedDragX = 0;
