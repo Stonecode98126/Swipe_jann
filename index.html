@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>窗簾連鎖動畫 - 照片最底層 / 卡片透明度 85%~100%</title>
+  <title>窗簾連鎖動畫 - 照片最底層 / 卡片透明度 85%~100%（已修正圖層順序）</title>
   <style>
     * {
       box-sizing: border-box;
@@ -44,7 +44,26 @@
       overflow: hidden;
     }
 
-    /* 外框容器 */
+    /* 【最底層】照片背景層 (z-index: 0，不透明度固定為 100%) */
+    /* 修正重點：不再放在 max-boundary-frame 裡面，改成獨立的最底層元素，
+       尺寸/位置由 JS 與 max-boundary-frame 同步，確保永遠疊在窗簾卡片下方 */
+    .stage-bg-layer {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      height: 80%;
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      border-radius: 6px;
+      overflow: hidden;
+      z-index: 0;
+      opacity: 1; /* 永遠為 100% 實色 */
+      pointer-events: none;
+      transition: all 0.2s ease;
+    }
+
+    /* 外框容器：現在只剩邊框視覺效果，不再包含照片，z-index 維持最高 */
     .max-boundary-frame {
       position: absolute;
       top: 50%;
@@ -56,25 +75,9 @@
       pointer-events: none;
       z-index: 20;
       transition: all 0.2s ease;
-      overflow: hidden;
     }
 
-    /* 【最底層】照片背景層 (z-index: 0，不透明度固定為 100%) */
-    .stage-bg-layer {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background-size: cover;
-      background-position: center;
-      background-repeat: no-repeat;
-      z-index: 0;
-      opacity: 1; /* 永遠為 100% 實色 */
-      pointer-events: none;
-    }
-
-    /* 窗簾軌道容器 */
+    /* 窗簾軌道容器：疊在照片上方、外框下方 */
     .curtain-container {
       position: absolute;
       top: 50%;
@@ -329,11 +332,10 @@
   <!-- 頂部面板 -->
   <div class="expandable-panel" id="expandablePanel">
     <div class="curtain-track-stage" id="curtainStage">
-      <!-- 外框容器（最底層包含相片，上方為動畫軌道） -->
-      <div class="max-boundary-frame" id="maxBoundaryFrame">
-        <!-- 【最底層相片】只存在於最底層 (z-index: 0) -->
-        <div class="stage-bg-layer" id="stageBgLayer"></div>
-      </div>
+      <!-- 【最底層相片】獨立元素，z-index: 0，永遠在最下面 -->
+      <div class="stage-bg-layer" id="stageBgLayer"></div>
+      <!-- 外框容器：純邊線視覺，z-index: 20，永遠在最上面 -->
+      <div class="max-boundary-frame" id="maxBoundaryFrame"></div>
       <div class="curtain-container" id="curtainTrack"></div>
     </div>
   </div>
@@ -383,7 +385,7 @@
         <input type="range" id="widthSlider" min="0" max="100" value="0" step="1">
       </div>
 
-      <!-- 【更新】卡片不透明度滑塊 (85% ~ 100%) -->
+      <!-- 卡片不透明度滑塊 (85% ~ 100%) -->
       <div class="slider-item">
         <label for="opacitySlider">
           <span>卡片不透明度 (85% ~ 100%)：</span>
@@ -603,6 +605,8 @@
     createThumbPicker(evenScrollBox, false, 1);
 
     // 3. 計算尺寸與邊界
+    // 修正重點：max-boundary-frame 的寬度/位置計算完後，同步套用到 stage-bg-layer，
+    // 讓背景照片跟外框永遠對齊，且照片保持在最底層 (z-index: 0)。
     function initFixedCardDimensions() {
       const stageWidth = curtainStage.clientWidth || window.innerWidth;
       const maxAllowedWidth = stageWidth * 0.88; 
@@ -620,20 +624,34 @@
 
       if (!isDoubleOpen) {
         const maxTotalWidth = singleCardWidth + (hookThreshold * 5);
+
         maxBoundaryFrame.style.width = `${maxTotalWidth}px`;
         maxBoundaryFrame.style.left = 'auto';
         maxBoundaryFrame.style.right = '6vw';
         maxBoundaryFrame.style.transform = 'translateY(-50%)';
+
+        // 同步套用到照片層
+        stageBgLayer.style.width = `${maxTotalWidth}px`;
+        stageBgLayer.style.left = 'auto';
+        stageBgLayer.style.right = '6vw';
+        stageBgLayer.style.transform = 'translateY(-50%)';
 
         curtainTrack.style.left = 'auto';
         curtainTrack.style.right = '6vw';
         curtainTrack.style.transform = 'translateY(-50%)';
       } else {
         const maxTotalWidth = singleCardWidth + (hookThreshold * 11);
+
         maxBoundaryFrame.style.width = `${maxTotalWidth}px`;
         maxBoundaryFrame.style.left = '50%';
         maxBoundaryFrame.style.right = 'auto';
         maxBoundaryFrame.style.transform = 'translate(-50%, -50%)';
+
+        // 同步套用到照片層
+        stageBgLayer.style.width = `${maxTotalWidth}px`;
+        stageBgLayer.style.left = '50%';
+        stageBgLayer.style.right = 'auto';
+        stageBgLayer.style.transform = 'translate(-50%, -50%)';
 
         curtainTrack.style.left = '50%';
         curtainTrack.style.right = 'auto';
@@ -724,7 +742,7 @@
       updateCurtainPositions(currentDragRatio);
     });
 
-    // 8. 【更新】調整「卡片」的不透明度 (85% ~ 100%)，不影響照片
+    // 8. 調整「卡片」的不透明度 (85% ~ 100%)，不影響照片
     opacitySlider.addEventListener('input', (e) => {
       const pct = Number(e.target.value);
       opacityVal.innerText = `${pct}%`;
